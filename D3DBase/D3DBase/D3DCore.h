@@ -1,6 +1,8 @@
 #pragma once
 
-#include <d3d9.h>
+#include <Windows.h>
+#include <mmsystem.h>
+#include <d3dx9.h>														//dx9 로 써야하는데 에러남
 
 #define WINNAME "D3DBase"
 #define WINSIZEX 800
@@ -114,6 +116,15 @@ HRESULT InitVB() {
 
 	return S_OK;
 }
+
+//행렬 설정
+//행렬은 세 개가 있는데, 각각 월드, 뷰, 프로젝션 행렬이다.
+//void SetupMatrices() {
+//	//월드 행렬
+//	D3DXMATRIXA16 matWorld;
+//
+//	UINT iTime = 
+//}
 
 //릴리즈
 void release() {
