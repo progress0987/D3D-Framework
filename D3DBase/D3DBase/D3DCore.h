@@ -11,7 +11,7 @@
 
 LPDIRECT3D9					g_pD3D			= NULL;						//D3D 디바이스를 생성할 D3D 객체 변수
 LPDIRECT3DDEVICE9			g_pd3dDevice	= NULL;						//렌더링에 사용될 D3D 디바이스
-LPDIRECT3DVERTEXBUFFER9		g_pVB			= NULL;						//정점을 보관할 정점 버퍼
+LPDIRECT3DVERTEXBUFFER9		g_pVB			= NULL;						//정점을 보관할 정점 버퍼 - 정점만을 계산하기위해 생성된 버퍼
 
 //사용자정의 정점 구조체
 struct CUSTOMVERTEX {
@@ -73,9 +73,14 @@ HRESULT InitD3D(HWND hWnd) {
 HRESULT InitVB() {
 	//삼각형을 렌더링하기 위해 정점 선언 -수정 -임시
 	CUSTOMVERTEX vertices[] = {
-		{150.f,50.f,0.5f,1.f,0xffff0000},
-		{250.f,250.f,0.5f,1.f,0xff00ff00},
-		{50.f,250.f,0.5f,1.f,0xff00ffff},
+		//색은 0xffff0000 과 같이 표현할 수 있는데 ARGB의 순서이다.
+		{150.f,50.f,0.5f,1.f,D3DCOLOR_RGBA(255,0,0,255)},
+		{250.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,255,0,255)},
+		{50.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,0,255,255)},
+
+		//{250.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,255,0,255)},
+		//{350.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(255,0,0,255)},
+		//{150.f,50.f,0.5f,1.f,D3DCOLOR_RGBA(0,0,255,255)},
 	};
 
 	/*
@@ -83,18 +88,25 @@ HRESULT InitVB() {
 
 	3개의 사용자정점들을 보관할 메모리를 할당한다.
 	FVF를 지정하여 보관할 데이터의 형식을 지정한다.
+	FVF - Flexible Vertex Format		- 유동적으로 버텍스를 지정한다고 선언할때
 	*/
-	if (FAILED(g_pd3dDevice->CreateVertexBuffer(3 * sizeof(CUSTOMVERTEX),	//버퍼 크기
-		0,																//사용량? -확인
-		D3DFVF_CUSTOMVERTEX,											//FVF 설정(커스텀은 앞에서 정의함) FVF가 뭔지 -확인
-		D3DPOOL_DEFAULT,												//D3D POOL? -확인
-		&g_pVB,															//버텍스 저장하는 버퍼
-		NULL
+	if (FAILED(g_pd3dDevice->CreateVertexBuffer(
+		3 * sizeof(CUSTOMVERTEX),										//생성할 정점버퍼의 바이트 단위 크기
+		0,																//정점 버퍼의 종류 혹은 처리방식(SW/HW) 지정
+		D3DFVF_CUSTOMVERTEX,											//정점 정보 구조체에 따라 선언된 FVF 플래그 값
+		D3DPOOL_DEFAULT,												//정점 버퍼가 저장될 메모리의 위치(비디오카드인지 시스템메모리인지 등)와 관리방식 지정
+		&g_pVB,															//반환될 정점 버퍼의 인터페이스
+		NULL															//예약되었는지(공유되었는지) 현재는 거의 무조건 NULL
 	))) {
 		return E_FAIL;
 	}
 	VOID* pVertices;
-	if (FAILED(g_pVB->Lock(0, sizeof(vertices), (void**)&pVertices, 0))) return E_FAIL;		//사용하기 위해서 락
+	if (FAILED(g_pVB->Lock(												//사용하기 위해서 락
+		0,																//Lock을 할 버퍼의 시작점, 아래와 함께 양쪽모두 0이면 전체 버퍼
+		sizeof(vertices),												//Lock을 할 버퍼의 크기, 위와 함께 양쪽모두 0이면 전체 버퍼
+		(void**)&pVertices,												//읽고 쓰기 수행하려는 메모리 영역의 포인터
+		0																//Lock 수행과 함께 사용되는 플래그
+	))) return E_FAIL;	
 	
 	memcpy(pVertices, vertices, sizeof(vertices));											//버텍스들을 복사해넣는다
 
@@ -142,7 +154,8 @@ void render() {
 
 		//3. 기하 정보를 출력하기 위한 DrawPrimitive() 함수 호출
 		g_pd3dDevice->DrawPrimitive(
-			D3DPT_TRIANGLELIST,											//그리는 타입들 인듯 -확인
+			//D3DPT_TRIANGLELIST,											//그리는 타입들 인듯 -확인
+			D3DPT_TRIANGLESTRIP,											//그리는 타입들 인듯 이거는 면으로 만드는것 -확인
 			0,															//어디서부터 그려가는지
 			1															//몇개의 삼각형을 그리는지? -확인
 		);
