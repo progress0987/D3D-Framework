@@ -2,7 +2,8 @@
 
 #include <Windows.h>
 #include <mmsystem.h>
-#include <d3dx9.h>														//dx9 로 써야하는데 에러남
+#include <d3dx9.h>														//dx9 로 써야하는데 에러남 - 깔려있던 라이브러리를 강제로 옮겨서 추가해줬음.
+//#include<d3d9.h>
 
 #define WINNAME "D3DBase"
 #define WINSIZEX 800
@@ -119,12 +120,41 @@ HRESULT InitVB() {
 
 //행렬 설정
 //행렬은 세 개가 있는데, 각각 월드, 뷰, 프로젝션 행렬이다.
-//void SetupMatrices() {
-//	//월드 행렬
-//	D3DXMATRIXA16 matWorld;
-//
-//	UINT iTime = 
-//}
+void SetupMatrices() {
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//월드 행렬
+	D3DXMATRIXA16 matWorld;
+
+	UINT iTime = timeGetTime() % 1000;									//float 연산의 정밀도를 위해서 1000으로 나머지 연산(1초)
+	FLOAT fAngle = iTime*(2.f*D3DX_PI) / 1000.f;						//1초마다 한바퀴씩(2*pi) 회전 애니매이션 행렬(?)
+	D3DXMatrixRotationY(&matWorld, fAngle);								//Y축기준으로 회전행렬을 생성
+
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);					//생성한 회전행렬을 월드행렬로 디바이스에 생성
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//뷰 행렬을 정의하기 위해서는 세가지 값이 필요.
+	D3DXMATRIXA16 matView;
+	D3DXVECTOR3 vEyePt(0.f, 3.f, -5.f);									//1. 눈의 위치 (0,3,-5)
+	D3DXVECTOR3 vLookatPt(0.f, 0.f, 0.f);								//2. 눈이 바라보는 위치(0,0,0)
+	D3DXVECTOR3 vUpVec(0.f, 1.f, 0.f);									//3. 천정방향을 나타내는 상방벡터(0,1,0) - 아마도 하늘부분을 설정해주는부분인듯? -확인
+	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);			//1,2,3의 값들로 뷰 행렬 생성
+
+	g_pd3dDevice->SetTransform(D3DTS_VIEW, &matView);					//생성한 뷰 행렬을 디바이스에 설정
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//프로젝션 행렬을 정의하기 위해서는 시야각(FOV - Field of View)과 종횡비(aspect ratio), 클리핑 평면의 값이 필요하다.
+	D3DXMATRIXA16 matProj;
+	/*
+	matProj			값이 설정될 행렬
+	D3DX_PI/4		FOV(45도)
+	1.0f			종횡비
+	1.0f			근접 클리핑 평면(near clipping plane)
+	100.f			원거리 클리핑 평면(far clipping plane)
+	*/
+	D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI / 4, 1.f, 1.f, 100.f);
+
+	g_pd3dDevice->SetTransform(D3DTS_PROJECTION, &matProj);
+}
 
 //릴리즈
 void release() {
@@ -152,6 +182,9 @@ void render() {
 	if (SUCCEEDED(g_pd3dDevice->BeginScene())) {						//렌더링 시작
 																		//실제 프로세스들이 실행될 곳
 		////////////////////////테스트 부분
+		//월드,뷰,프로젝션 행렬을 설정
+		SetupMatrices();
+
 		//정점버퍼의 삼각형을 그리기 시작
 		//1. 정점 정보가 담겨있는 정점 버퍼를 출력 스트림으로 할당한다
 		g_pd3dDevice->SetStreamSource(
