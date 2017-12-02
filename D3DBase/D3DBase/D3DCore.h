@@ -5,9 +5,6 @@
 #include <d3dx9.h>														//dx9 로 써야하는데 에러남 - 깔려있던 라이브러리를 강제로 옮겨서 추가해줬음.
 //#include<d3d9.h>
 
-#define WINNAME "D3DBase"
-#define WINSIZEX 800
-#define WINSIZEY 600
 
 //전역변수
 //g로 시작하는건 글로벌(전역)
@@ -57,11 +54,14 @@ HRESULT InitD3D(HWND hWnd) {
 		&g_pd3dDevice))) {
 		return E_FAIL;
 	}
+	g_pd3dDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);			//컬링 기능을 끈다. 삼각형의 앞면, 뒷면 모두 렌더링한다 -확인
+
+	g_pd3dDevice->SetRenderState(D3DRS_LIGHTING, FALSE);				//정점의 색깔값이 있으므로, 광원기능을 끈다 -확인
 
 	return S_OK;														//디바이스 상태정보 처리 완료
 }
 
-//정점 버퍼의 초기화
+//정점 버퍼의 초기화 (실습2장)
 /*	정점 버퍼를 생성하고 정점 값들을 채워넣는다.
 
  *	정점 버퍼란 기본적으로 정점 정보를 갖고있는 메모리의 블록이다.
@@ -118,6 +118,47 @@ HRESULT InitVB() {
 	return S_OK;
 }
 
+//기하정보 초기화 - 회전에서 사용 (실습3장)
+HRESULT InitGeometry() {
+	CUSTOMVERTEX vertices[] = {
+		//색은 0xffff0000 과 같이 표현할 수 있는데 ARGB의 순서이다.
+		{	-1.0f	,-1.0f	,0.0f, 0xffff0000, },
+		{	1.0f	,-1.0f	,0.0f, 0xff0000ff, },
+		{	0.0f	,1.0f	,0.0f, 0xffffffff, },
+	};
+
+	/*
+	정점 버퍼 생성
+
+	3개의 사용자정점들을 보관할 메모리를 할당한다.
+	FVF를 지정하여 보관할 데이터의 형식을 지정한다.
+	FVF - Flexible Vertex Format		- 유동적으로 버텍스를 지정한다고 선언할때
+	*/
+	if (FAILED(g_pd3dDevice->CreateVertexBuffer(
+		3 * sizeof(CUSTOMVERTEX),										//생성할 정점버퍼의 바이트 단위 크기
+		0,																//정점 버퍼의 종류 혹은 처리방식(SW/HW) 지정
+		D3DFVF_CUSTOMVERTEX,											//정점 정보 구조체에 따라 선언된 FVF 플래그 값
+		D3DPOOL_DEFAULT,												//정점 버퍼가 저장될 메모리의 위치(비디오카드인지 시스템메모리인지 등)와 관리방식 지정
+		&g_pVB,															//반환될 정점 버퍼의 인터페이스
+		NULL															//예약되었는지(공유되었는지) 현재는 거의 무조건 NULL
+	))) {
+		return E_FAIL;
+	}
+	VOID* pVertices;
+	if (FAILED(g_pVB->Lock(												//사용하기 위해서 락
+		0,																//Lock을 할 버퍼의 시작점, 아래와 함께 양쪽모두 0이면 전체 버퍼
+		sizeof(vertices),												//Lock을 할 버퍼의 크기, 위와 함께 양쪽모두 0이면 전체 버퍼
+		(void**)&pVertices,												//읽고 쓰기 수행하려는 메모리 영역의 포인터
+		0																//Lock 수행과 함께 사용되는 플래그
+	))) return E_FAIL;
+
+	memcpy(pVertices, vertices, sizeof(vertices));											//버텍스들을 복사해넣는다
+
+	g_pVB->Unlock();																		//사용이 풀려서 언락
+
+	return S_OK;
+}
+
 //행렬 설정
 //행렬은 세 개가 있는데, 각각 월드, 뷰, 프로젝션 행렬이다.
 void SetupMatrices() {
@@ -126,22 +167,27 @@ void SetupMatrices() {
 	D3DXMATRIXA16 matWorld;
 
 	UINT iTime = timeGetTime() % 1000;									//float 연산의 정밀도를 위해서 1000으로 나머지 연산(1초)
-	FLOAT fAngle = iTime*(2.f*D3DX_PI) / 1000.f;						//1초마다 한바퀴씩(2*pi) 회전 애니매이션 행렬(?)
+	FLOAT fAngle = iTime*(2.f*D3DX_PI) / 1000.f;						//1초마다 한바퀴씩(2*pi) 회전
 	D3DXMatrixRotationY(&matWorld, fAngle);								//Y축기준으로 회전행렬을 생성
 
 	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);					//생성한 회전행렬을 월드행렬로 디바이스에 생성
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//뷰 행렬
+
 	//뷰 행렬을 정의하기 위해서는 세가지 값이 필요.
 	D3DXMATRIXA16 matView;
+
 	D3DXVECTOR3 vEyePt(0.f, 3.f, -5.f);									//1. 눈의 위치 (0,3,-5)
 	D3DXVECTOR3 vLookatPt(0.f, 0.f, 0.f);								//2. 눈이 바라보는 위치(0,0,0)
 	D3DXVECTOR3 vUpVec(0.f, 1.f, 0.f);									//3. 천정방향을 나타내는 상방벡터(0,1,0) - 아마도 하늘부분을 설정해주는부분인듯? -확인
-	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);			//1,2,3의 값들로 뷰 행렬 생성
+	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);			//1,2,3의 값들로 뷰 행렬 생성 - 좌수좌표계(LH)
 
 	g_pd3dDevice->SetTransform(D3DTS_VIEW, &matView);					//생성한 뷰 행렬을 디바이스에 설정
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//프로젝션 행렬
+
 	//프로젝션 행렬을 정의하기 위해서는 시야각(FOV - Field of View)과 종횡비(aspect ratio), 클리핑 평면의 값이 필요하다.
 	D3DXMATRIXA16 matProj;
 	/*
@@ -151,13 +197,16 @@ void SetupMatrices() {
 	1.0f			근접 클리핑 평면(near clipping plane)
 	100.f			원거리 클리핑 평면(far clipping plane)
 	*/
-	D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI / 4, 1.f, 1.f, 100.f);
+	D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI / 4, 1.f, 1.f, 100.f);	//좌수좌표계(LH)
 
 	g_pd3dDevice->SetTransform(D3DTS_PROJECTION, &matProj);
 }
 
 //릴리즈
 void release() {
+	if (g_pVB != NULL) {
+		g_pVB->Release();
+	}
 	if (g_pd3dDevice != NULL) {
 		g_pd3dDevice->Release();
 	}
@@ -175,15 +224,18 @@ void render() {
 		0,
 		NULL,															//아마 클리어 해줄 범위 렉트인듯 -확인
 		D3DCLEAR_TARGET,
-		D3DCOLOR_XRGB(0, 0, 255),
+		D3DCOLOR_XRGB(0, 128, 255),
 		1.0f,
 		0);
+	//월드,뷰,프로젝션 행렬을 설정
+	SetupMatrices();
 
-	if (SUCCEEDED(g_pd3dDevice->BeginScene())) {						//렌더링 시작
-																		//실제 프로세스들이 실행될 곳
+	if (SUCCEEDED(g_pd3dDevice->BeginScene())) {						//렌더링 시작 (렌더링시작(beginscene) 과 렌더링 끝(endscene)
+																		//사이에는 최대한 간결하게해야 코드 속도가 높아진다.
+
+																		//이하는 실제 프로세스들이 실행될 곳
 		////////////////////////테스트 부분
-		//월드,뷰,프로젝션 행렬을 설정
-		SetupMatrices();
+
 
 		//정점버퍼의 삼각형을 그리기 시작
 		//1. 정점 정보가 담겨있는 정점 버퍼를 출력 스트림으로 할당한다
@@ -198,12 +250,11 @@ void render() {
 
 		//3. 기하 정보를 출력하기 위한 DrawPrimitive() 함수 호출
 		g_pd3dDevice->DrawPrimitive(
-			//D3DPT_TRIANGLELIST,											//그리는 타입들 인듯 -확인
-			D3DPT_TRIANGLESTRIP,											//그리는 타입들 인듯 이거는 면으로 만드는것 -확인
+			//D3DPT_TRIANGLELIST,										//그리는 타입들 인듯 -확인
+			D3DPT_TRIANGLESTRIP,										//그리는 타입들 인듯 이거는 면으로 만드는것 -확인
 			0,															//어디서부터 그려가는지
 			1															//몇개의 삼각형을 그리는지? -확인
 		);
-
 
 		g_pd3dDevice->EndScene();										//그리기 종료
 	}

@@ -6,6 +6,9 @@
 
 #include "D3DCore.h"
 
+#define WINNAME "D3DBase"
+#define WINSIZEX 800
+#define WINSIZEY 600
 //윈도우 프로시저
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
@@ -30,16 +33,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT) {
 		100,															//윈도우 시작점 Y
 		WINSIZEX,														//윈도우 폭
 		WINSIZEY,														//윈도우 높이
-		//GetDesktopWindow(),												//부모 윈도우 핸들 -확인
-		NULL,
+		GetDesktopWindow(),												//부모 윈도우 핸들 -확인
+		//NULL,
 		NULL,															//메뉴 만들건지 -확인
 		wc.hInstance,													//윈도우클래스의 인스턴스
 		NULL);															//LPARAM
 
 	//D3D 초기화
 	if (SUCCEEDED(InitD3D(hWnd))) {
-		if (SUCCEEDED(InitVB())) {
-			ShowWindow(hWnd, SW_SHOWDEFAULT);								//윈도우 출력
+		//if (SUCCEEDED(InitVB())) {									//VB가 되면 출력하는거(실습 2장)
+		if (SUCCEEDED(InitGeometry())) {								//geometry가 되면 출력하는거(실습 3장)
+			ShowWindow(hWnd, SW_SHOWDEFAULT);							//윈도우 출력
 			UpdateWindow(hWnd);
 
 			MSG msg;
