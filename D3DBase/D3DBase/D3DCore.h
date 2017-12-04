@@ -178,10 +178,10 @@ void SetupMatrices() {
 	//뷰 행렬을 정의하기 위해서는 세가지 값이 필요.
 	D3DXMATRIXA16 matView;
 
-	D3DXVECTOR3 vEyePt(0.f, 3.f, -5.f);									//1. 눈의 위치 (0,3,-5)
-	D3DXVECTOR3 vLookatPt(0.f, 0.f, 0.f);								//2. 눈이 바라보는 위치(0,0,0)
-	D3DXVECTOR3 vUpVec(0.f, 1.f, 0.f);									//3. 천정방향을 나타내는 상방벡터(0,1,0) - 아마도 하늘부분을 설정해주는부분인듯? -확인
-	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);			//1,2,3의 값들로 뷰 행렬 생성 - 좌수좌표계(LH)
+	D3DXVECTOR3 vEyePt(0.0f, 3.0f, -5.0f);									//1. 눈의 위치 (0,3,-5)
+	D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);								//2. 눈이 바라보는 위치(0,0,0)
+	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);									//3. 천정방향을 나타내는 상방벡터(0,1,0) - 아마도 하늘부분을 설정해주는부분인듯? -확인
+	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);				//1,2,3의 값들로 뷰 행렬 생성 - 좌수좌표계(LH)
 
 	g_pd3dDevice->SetTransform(D3DTS_VIEW, &matView);					//생성한 뷰 행렬을 디바이스에 설정
 
