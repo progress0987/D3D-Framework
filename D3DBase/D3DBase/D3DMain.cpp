@@ -17,27 +17,86 @@
  //전역변수
  //g로 시작하는건 글로벌(전역)
 
-static LPDIRECT3D9					g_pD3D = NULL;						//D3D 디바이스를 생성할 D3D 객체 변수
-static LPDIRECT3DDEVICE9			g_pd3dDevice = NULL;						//렌더링에 사용될 D3D 디바이스
-static LPDIRECT3DVERTEXBUFFER9		g_pVB = NULL;						//정점을 보관할 정점 버퍼 - 정점만을 계산하기위해 생성된 버퍼
+LPDIRECT3D9					g_pD3D = NULL;						//D3D 디바이스를 생성할 D3D 객체 변수
+LPDIRECT3DDEVICE9			g_pd3dDevice = NULL;						//렌더링에 사용될 D3D 디바이스
+LPDIRECT3DVERTEXBUFFER9		g_pVB = NULL;						//정점을 보관할 정점 버퍼 - 정점만을 계산하기위해 생성된 버퍼
 
 																		//사용자정의 정점 구조체
+//struct CUSTOMVERTEX {
+//	FLOAT x, y, z, rhw;													//정점과 관련된 좌표들(rhw값이 있으면 변환이 완료된 정점이라는것)
+//																		//ps - rhw, x, y, z 의 순서로 변수를 잡으면 FVF 선언순서에 위배된다고 함 -확인
+//
+//	DWORD color;														//정점 색깔
+//};
+////사용자 정점 구조체에 관한 정보를 나타내는 FVF 값
+////구조체는 x,y,z,rhw값과 diffuse 색깔값으로 이루어져있다는 선언
+//#define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZRHW|D3DFVF_DIFFUSE)
+//////////////////////////////2장까지는 rhw있는것을 사용함.
+
 struct CUSTOMVERTEX {
-	FLOAT x, y, z, rhw;													//정점과 관련된 좌표들(rhw값이 있으면 변환이 완료된 정점이라는것)
+	FLOAT x, y, z;													//정점과 관련된 좌표들(rhw값이 있으면 변환이 완료된 정점이라는것)
 																		//ps - rhw, x, y, z 의 순서로 변수를 잡으면 FVF 선언순서에 위배된다고 함 -확인
 
 	DWORD color;														//정점 색깔
 };
 //사용자 정점 구조체에 관한 정보를 나타내는 FVF 값
 //구조체는 x,y,z,rhw값과 diffuse 색깔값으로 이루어져있다는 선언
-#define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZRHW|D3DFVF_DIFFUSE)
+#define D3DFVF_CUSTOMVERTEX (D3DFVF_XYZ|D3DFVF_DIFFUSE)
+
+
+
+
 HRESULT InitD3D(HWND hWnd);
 HRESULT InitVB();
-void release();
-void render();
-void SetupMatrices();
+HRESULT InitGeometry();
+VOID release();
+VOID render();
+VOID SetupMatrices();
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+//WINAPI
+
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT) {
+	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, MsgProc, 0L,0L,	//윈도우 클래스 등록 -확인
+		GetModuleHandle(NULL),NULL,NULL,NULL,NULL,WINNAME,NULL };
+	RegisterClassEx(&wc);
+
+	HWND	hWnd = CreateWindow(WINNAME,								//윈도우 생성
+		WINNAME,														//윈도우 이름
+		WS_OVERLAPPEDWINDOW,
+		100,															//윈도우 시작점 X
+		100,															//윈도우 시작점 Y
+		WINSIZEX,														//윈도우 폭
+		WINSIZEY,														//윈도우 높이
+		GetDesktopWindow(),												//부모 윈도우 핸들 -확인
+																		//NULL,
+		NULL,															//메뉴 만들건지 -확인
+		wc.hInstance,													//윈도우클래스의 인스턴스
+		NULL);															//LPARAM
+
+																		//D3D 초기화
+	if (SUCCEEDED(InitD3D(hWnd))) {
+		//if (SUCCEEDED(InitVB())) {									//VB가 되면 출력하는거(실습 2장)
+		if (SUCCEEDED(InitGeometry())) {								//geometry가 되면 출력하는거(실습 3장)
+			ShowWindow(hWnd, SW_SHOWDEFAULT);							//윈도우 출력
+			UpdateWindow(hWnd);
+
+			MSG msg;
+			ZeroMemory(&msg, sizeof(msg));
+			while (msg.message != WM_QUIT) {							//메세지 루프
+				if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+				else {
+					render();
+				}
+			}
+		}
+	}
+	UnregisterClass(WINNAME, wc.hInstance);								//등록된 클래스 소거
+	return 0;
+}
 //D3D초기화
 HRESULT InitD3D(HWND hWnd) {
 	g_pD3D = Direct3DCreate9(D3D_SDK_VERSION);
@@ -86,50 +145,50 @@ HRESULT InitD3D(HWND hWnd) {
 *	정점 버퍼나 인덱스 버퍼는 기본 시스템 메모리 외에 디바이스 메모리(비디오카드의 메모리) 에 생성될 수 있는데
 대부분의 비디오카드에서는 이렇게 할 경우 엄청난 속도의 향상을 얻을 수 있다.
 */
-HRESULT InitVB() {
-	//삼각형을 렌더링하기 위해 정점 선언 -수정 -임시
-	CUSTOMVERTEX vertices[] = {
-		//색은 0xffff0000 과 같이 표현할 수 있는데 ARGB의 순서이다.
-		{ 150.f,50.f,0.5f,1.f,D3DCOLOR_RGBA(255,0,0,255) },
-		{ 250.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,255,0,255) },
-		{ 50.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,0,255,255) },
-
-		//{250.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,255,0,255)},
-		//{350.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(255,0,0,255)},
-		//{150.f,50.f,0.5f,1.f,D3DCOLOR_RGBA(0,0,255,255)},
-	};
-
-	/*
-	정점 버퍼 생성
-
-	3개의 사용자정점들을 보관할 메모리를 할당한다.
-	FVF를 지정하여 보관할 데이터의 형식을 지정한다.
-	FVF - Flexible Vertex Format		- 유동적으로 버텍스를 지정한다고 선언할때
-	*/
-	if (FAILED(g_pd3dDevice->CreateVertexBuffer(
-		3 * sizeof(CUSTOMVERTEX),										//생성할 정점버퍼의 바이트 단위 크기
-		0,																//정점 버퍼의 종류 혹은 처리방식(SW/HW) 지정
-		D3DFVF_CUSTOMVERTEX,											//정점 정보 구조체에 따라 선언된 FVF 플래그 값
-		D3DPOOL_DEFAULT,												//정점 버퍼가 저장될 메모리의 위치(비디오카드인지 시스템메모리인지 등)와 관리방식 지정
-		&g_pVB,															//반환될 정점 버퍼의 인터페이스
-		NULL															//예약되었는지(공유되었는지) 현재는 거의 무조건 NULL
-	))) {
-		return E_FAIL;
-	}
-	VOID* pVertices;
-	if (FAILED(g_pVB->Lock(												//사용하기 위해서 락
-		0,																//Lock을 할 버퍼의 시작점, 아래와 함께 양쪽모두 0이면 전체 버퍼
-		sizeof(vertices),												//Lock을 할 버퍼의 크기, 위와 함께 양쪽모두 0이면 전체 버퍼
-		(void**)&pVertices,												//읽고 쓰기 수행하려는 메모리 영역의 포인터
-		0																//Lock 수행과 함께 사용되는 플래그
-	))) return E_FAIL;
-
-	memcpy(pVertices, vertices, sizeof(vertices));											//버텍스들을 복사해넣는다
-
-	g_pVB->Unlock();																		//사용이 풀려서 언락
-
-	return S_OK;
-}
+//HRESULT InitVB() {
+//	//삼각형을 렌더링하기 위해 정점 선언 -수정 -임시
+//	CUSTOMVERTEX vertices[] = {
+//		//색은 0xffff0000 과 같이 표현할 수 있는데 ARGB의 순서이다.
+//		{ 150.f,50.f,0.5f,1.f,D3DCOLOR_RGBA(255,0,0,255) },
+//		{ 250.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,255,0,255) },
+//		{ 50.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,0,255,255) },
+//
+//		//{250.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(0,255,0,255)},
+//		//{350.f,250.f,0.5f,1.f,D3DCOLOR_RGBA(255,0,0,255)},
+//		//{150.f,50.f,0.5f,1.f,D3DCOLOR_RGBA(0,0,255,255)},
+//	};
+//
+//	/*
+//	정점 버퍼 생성
+//
+//	3개의 사용자정점들을 보관할 메모리를 할당한다.
+//	FVF를 지정하여 보관할 데이터의 형식을 지정한다.
+//	FVF - Flexible Vertex Format		- 유동적으로 버텍스를 지정한다고 선언할때
+//	*/
+//	if (FAILED(g_pd3dDevice->CreateVertexBuffer(
+//		3 * sizeof(CUSTOMVERTEX),										//생성할 정점버퍼의 바이트 단위 크기
+//		0,																//정점 버퍼의 종류 혹은 처리방식(SW/HW) 지정
+//		D3DFVF_CUSTOMVERTEX,											//정점 정보 구조체에 따라 선언된 FVF 플래그 값
+//		D3DPOOL_DEFAULT,												//정점 버퍼가 저장될 메모리의 위치(비디오카드인지 시스템메모리인지 등)와 관리방식 지정
+//		&g_pVB,															//반환될 정점 버퍼의 인터페이스
+//		NULL															//예약되었는지(공유되었는지) 현재는 거의 무조건 NULL
+//	))) {
+//		return E_FAIL;
+//	}
+//	VOID* pVertices;
+//	if (FAILED(g_pVB->Lock(												//사용하기 위해서 락
+//		0,																//Lock을 할 버퍼의 시작점, 아래와 함께 양쪽모두 0이면 전체 버퍼
+//		sizeof(vertices),												//Lock을 할 버퍼의 크기, 위와 함께 양쪽모두 0이면 전체 버퍼
+//		(void**)&pVertices,												//읽고 쓰기 수행하려는 메모리 영역의 포인터
+//		0																//Lock 수행과 함께 사용되는 플래그
+//	))) return E_FAIL;
+//
+//	memcpy(pVertices, vertices, sizeof(vertices));											//버텍스들을 복사해넣는다
+//
+//	g_pVB->Unlock();																		//사용이 풀려서 언락
+//
+//	return S_OK;
+//}
 
 //기하정보 초기화 - 회전에서 사용 (실습3장)
 HRESULT InitGeometry() {
@@ -172,51 +231,8 @@ HRESULT InitGeometry() {
 	return S_OK;
 }
 
-//행렬 설정
-//행렬은 세 개가 있는데, 각각 월드, 뷰, 프로젝션 행렬이다.
-VOID SetupMatrices() {
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//월드 행렬
-	D3DXMATRIXA16 matWorld;
-
-	UINT iTime = timeGetTime() % 1000;									//float 연산의 정밀도를 위해서 1000으로 나머지 연산(1초)
-	FLOAT fAngle = iTime*(2.0f*D3DX_PI) / 1000.f;						//1초마다 한바퀴씩(2*pi) 회전
-	D3DXMatrixRotationY(&matWorld, fAngle);								//Y축기준으로 회전행렬을 생성
-
-	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);					//생성한 회전행렬을 월드행렬로 디바이스에 생성
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//뷰 행렬
-
-	//뷰 행렬을 정의하기 위해서는 세가지 값이 필요.
-	D3DXMATRIXA16 matView;
-
-	D3DXVECTOR3 vEyePt(0.0f, 3.0f, -5.0f);									//1. 눈의 위치 (0,3,-5)
-	D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);								//2. 눈이 바라보는 위치(0,0,0)
-	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);									//3. 천정방향을 나타내는 상방벡터(0,1,0) - 아마도 하늘부분을 설정해주는부분인듯? -확인
-	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);				//1,2,3의 값들로 뷰 행렬 생성 - 좌수좌표계(LH)
-
-	g_pd3dDevice->SetTransform(D3DTS_VIEW, &matView);					//생성한 뷰 행렬을 디바이스에 설정
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//프로젝션 행렬
-
-	//프로젝션 행렬을 정의하기 위해서는 시야각(FOV - Field of View)과 종횡비(aspect ratio), 클리핑 평면의 값이 필요하다.
-	D3DXMATRIXA16 matProj;
-	/*
-	matProj			값이 설정될 행렬
-	D3DX_PI/4		FOV(45도)
-	1.0f			종횡비
-	1.0f			근접 클리핑 평면(near clipping plane)
-	100.f			원거리 클리핑 평면(far clipping plane)
-	*/
-	D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI / 4, 1.f, 1.f, 100.f);	//좌수좌표계(LH)
-
-	g_pd3dDevice->SetTransform(D3DTS_PROJECTION, &matProj);
-}
-
 //릴리즈
-void release() {
+VOID release() {
 	if (g_pVB != NULL) {
 		g_pVB->Release();
 	}
@@ -229,7 +245,7 @@ void release() {
 }
 
 //렌더
-void render() {
+VOID render() {
 	if (g_pd3dDevice == NULL) {
 		return;
 	}
@@ -279,6 +295,50 @@ void render() {
 		NULL
 	);
 }
+//행렬 설정
+//행렬은 세 개가 있는데, 각각 월드, 뷰, 프로젝션 행렬이다.
+VOID SetupMatrices() {
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//월드 행렬
+	D3DXMATRIXA16 matWorld;
+
+	UINT iTime = timeGetTime() % 1000;									//float 연산의 정밀도를 위해서 1000으로 나머지 연산(1초)
+	FLOAT fAngle = iTime*(2.0f*D3DX_PI) / 1000.f;						//1초마다 한바퀴씩(2*pi) 회전
+	D3DXMatrixRotationY(&matWorld, fAngle);								//Y축기준으로 회전행렬을 생성
+
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);					//생성한 회전행렬을 월드행렬로 디바이스에 생성
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//뷰 행렬
+
+	//뷰 행렬을 정의하기 위해서는 세가지 값이 필요.
+	D3DXMATRIXA16 matView;
+
+	D3DXVECTOR3 vEyePt(0.0f, 3.0f, -5.0f);									//1. 눈의 위치 (0,3,-5)
+	D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);								//2. 눈이 바라보는 위치(0,0,0)
+	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);									//3. 천정방향을 나타내는 상방벡터(0,1,0) - 아마도 하늘부분을 설정해주는부분인듯? -확인
+	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);				//1,2,3의 값들로 뷰 행렬 생성 - 좌수좌표계(LH)
+
+	g_pd3dDevice->SetTransform(D3DTS_VIEW, &matView);					//생성한 뷰 행렬을 디바이스에 설정
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//프로젝션 행렬
+
+	//프로젝션 행렬을 정의하기 위해서는 시야각(FOV - Field of View)과 종횡비(aspect ratio), 클리핑 평면의 값이 필요하다.
+	D3DXMATRIXA16 matProj;
+	/*
+	matProj			값이 설정될 행렬
+	D3DX_PI/4		FOV(45도)
+	1.0f			종횡비
+	1.0f			근접 클리핑 평면(near clipping plane)
+	100.f			원거리 클리핑 평면(far clipping plane)
+	*/
+	D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI / 4, 1.f, 1.f, 100.f);	//좌수좌표계(LH)
+
+	g_pd3dDevice->SetTransform(D3DTS_PROJECTION, &matProj);
+}
+
+
 //윈도우 프로시저
 LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
@@ -289,47 +349,5 @@ LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	}
 	return DefWindowProc(hWnd, msg, wParam, lParam);
 }
-//WINAPI
 
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, INT) {
-	WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, MsgProc, 0L,0L,	//윈도우 클래스 등록 -확인
-					GetModuleHandle(NULL),NULL,NULL,NULL,NULL,WINNAME,NULL };
-	RegisterClassEx(&wc);
-
-	HWND	hWnd = CreateWindow(WINNAME,								//윈도우 생성
-		WINNAME,														//윈도우 이름
-		WS_OVERLAPPEDWINDOW,
-		100,															//윈도우 시작점 X
-		100,															//윈도우 시작점 Y
-		WINSIZEX,														//윈도우 폭
-		WINSIZEY,														//윈도우 높이
-		GetDesktopWindow(),												//부모 윈도우 핸들 -확인
-		//NULL,
-		NULL,															//메뉴 만들건지 -확인
-		wc.hInstance,													//윈도우클래스의 인스턴스
-		NULL);															//LPARAM
-
-	//D3D 초기화
-	if (SUCCEEDED(InitD3D(hWnd))) {
-		//if (SUCCEEDED(InitVB())) {									//VB가 되면 출력하는거(실습 2장)
-		if (SUCCEEDED(InitGeometry())) {								//geometry가 되면 출력하는거(실습 3장)
-			ShowWindow(hWnd, SW_SHOWDEFAULT);							//윈도우 출력
-			UpdateWindow(hWnd);
-
-			MSG msg;
-			ZeroMemory(&msg, sizeof(msg));
-			while (msg.message != WM_QUIT) {							//메세지 루프
-				if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
-					TranslateMessage(&msg);
-					DispatchMessage(&msg);
-				}
-				else {
-					render();
-				}
-			}
-		}
-	}
-	UnregisterClass(WINNAME, wc.hInstance);								//등록된 클래스 소거
-	return 0;
-}
 /////////////////////////////////////////////////////////////////////////////////////////////

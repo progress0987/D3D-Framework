@@ -98,24 +98,40 @@
 //HRESULT InitVB()
 //{
 //	CUSTOMVERTEX vertices[] = {
-//		{ -1.f, -1.f, 0.0f, 0xffff0000, },
-//		{ 1.f, -1.f, 0.0f, 0xff0000ff, },
-//		{ 0.f, 1.0f, 0.0f, 0xffffffff, },
+//		//색은 0xffff0000 과 같이 표현할 수 있는데 ARGB의 순서이다.
+//		{ -1.0f	,-1.0f	,0.0f, 0xffff0000, },
+//		{ 1.0f	,-1.0f	,0.0f, 0xff0000ff, },
+//		{ 0.0f	,1.0f	,0.0f, 0xffffffff, },
 //	};
 //
-//	// 정점 버퍼 생성
-//	if (FAILED(g_pd3dDevice->CreateVertexBuffer(sizeof(vertices), 0, D3DFVF_CUSTOMVERTEX, D3DPOOL_DEFAULT, &g_pVB, NULL))) {
-//		return E_FAIL;
-//	}
+//	/*
+//	정점 버퍼 생성
 //
-//	// 생성한 정점 버퍼에 값을 채운다.
-//	// Lock(), Unlock() 함수를 사용해야 한다.
-//	VOID* pVertices;
-//	if (FAILED(g_pVB->Lock(0, sizeof(vertices), (void**)&pVertices, 0))) {
+//	3개의 사용자정점들을 보관할 메모리를 할당한다.
+//	FVF를 지정하여 보관할 데이터의 형식을 지정한다.
+//	FVF - Flexible Vertex Format		- 유동적으로 버텍스를 지정한다고 선언할때
+//	*/
+//	if (FAILED(g_pd3dDevice->CreateVertexBuffer(
+//		3 * sizeof(CUSTOMVERTEX),										//생성할 정점버퍼의 바이트 단위 크기
+//		0,																//정점 버퍼의 종류 혹은 처리방식(SW/HW) 지정
+//		D3DFVF_CUSTOMVERTEX,											//정점 정보 구조체에 따라 선언된 FVF 플래그 값
+//		D3DPOOL_DEFAULT,												//정점 버퍼가 저장될 메모리의 위치(비디오카드인지 시스템메모리인지 등)와 관리방식 지정
+//		&g_pVB,															//반환될 정점 버퍼의 인터페이스
+//		NULL															//예약되었는지(공유되었는지) 현재는 거의 무조건 NULL
+//	))) {
 //		return E_FAIL;
 //	}
-//	memcpy(pVertices, vertices, sizeof(vertices));
-//	g_pVB->Unlock();
+//	VOID* pVertices;
+//	if (FAILED(g_pVB->Lock(												//사용하기 위해서 락
+//		0,																//Lock을 할 버퍼의 시작점, 아래와 함께 양쪽모두 0이면 전체 버퍼
+//		sizeof(vertices),												//Lock을 할 버퍼의 크기, 위와 함께 양쪽모두 0이면 전체 버퍼
+//		(void**)&pVertices,												//읽고 쓰기 수행하려는 메모리 영역의 포인터
+//		0																//Lock 수행과 함께 사용되는 플래그
+//	))) return E_FAIL;
+//
+//	memcpy(pVertices, vertices, sizeof(vertices));											//버텍스들을 복사해넣는다
+//
+//	g_pVB->Unlock();																		//사용이 풀려서 언락
 //
 //	return S_OK;
 //}
