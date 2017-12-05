@@ -9,9 +9,9 @@
 //전역변수
 //g로 시작하는건 글로벌(전역)
 
-LPDIRECT3D9					g_pD3D			= NULL;						//D3D 디바이스를 생성할 D3D 객체 변수
-LPDIRECT3DDEVICE9			g_pd3dDevice	= NULL;						//렌더링에 사용될 D3D 디바이스
-LPDIRECT3DVERTEXBUFFER9		g_pVB			= NULL;						//정점을 보관할 정점 버퍼 - 정점만을 계산하기위해 생성된 버퍼
+static LPDIRECT3D9					g_pD3D			= NULL;						//D3D 디바이스를 생성할 D3D 객체 변수
+static LPDIRECT3DDEVICE9			g_pd3dDevice	= NULL;						//렌더링에 사용될 D3D 디바이스
+static LPDIRECT3DVERTEXBUFFER9		g_pVB			= NULL;						//정점을 보관할 정점 버퍼 - 정점만을 계산하기위해 생성된 버퍼
 
 //사용자정의 정점 구조체
 struct CUSTOMVERTEX {
@@ -161,46 +161,76 @@ HRESULT InitGeometry() {
 
 //행렬 설정
 //행렬은 세 개가 있는데, 각각 월드, 뷰, 프로젝션 행렬이다.
-void SetupMatrices() {
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//월드 행렬
+
+VOID SetupMatrices()
+{
+	// 월드 행렬 설정
 	D3DXMATRIXA16 matWorld;
 
-	UINT iTime = timeGetTime() % 1000;									//float 연산의 정밀도를 위해서 1000으로 나머지 연산(1초)
-	FLOAT fAngle = iTime*(2.f*D3DX_PI) / 1000.f;						//1초마다 한바퀴씩(2*pi) 회전
-	D3DXMatrixRotationY(&matWorld, fAngle);								//Y축기준으로 회전행렬을 생성
+	UINT iTime = timeGetTime() % 1000;
+	FLOAT fAngle = iTime * (2.f * D3DX_PI) / 1000.f;
+	D3DXMatrixRotationY(&matWorld, fAngle);
+	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);
 
-	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);					//생성한 회전행렬을 월드행렬로 디바이스에 생성
+	// 뷰 행렬 설정
+	D3DXVECTOR3 vEyePt(0.0f, 0.0f, -5.0f);  // 카메라의 위치
+	D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);    // 카메라가 바라보는 지점
+	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);   // 카메라의 상향벡터
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//뷰 행렬
-
-	//뷰 행렬을 정의하기 위해서는 세가지 값이 필요.
 	D3DXMATRIXA16 matView;
+	// 카메라 변환 행렬 계산
+	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);
+	// 계산된 카메라 변환 행렬을 적용
+	g_pd3dDevice->SetTransform(D3DTS_VIEW, &matView);
 
-	D3DXVECTOR3 vEyePt(0.0f, 3.0f, -5.0f);									//1. 눈의 위치 (0,3,-5)
-	D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);								//2. 눈이 바라보는 위치(0,0,0)
-	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);									//3. 천정방향을 나타내는 상방벡터(0,1,0) - 아마도 하늘부분을 설정해주는부분인듯? -확인
-	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);				//1,2,3의 값들로 뷰 행렬 생성 - 좌수좌표계(LH)
-
-	g_pd3dDevice->SetTransform(D3DTS_VIEW, &matView);					//생성한 뷰 행렬을 디바이스에 설정
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//프로젝션 행렬
-
-	//프로젝션 행렬을 정의하기 위해서는 시야각(FOV - Field of View)과 종횡비(aspect ratio), 클리핑 평면의 값이 필요하다.
+	// 프로젝션 행렬 설정
 	D3DXMATRIXA16 matProj;
-	/*
-	matProj			값이 설정될 행렬
-	D3DX_PI/4		FOV(45도)
-	1.0f			종횡비
-	1.0f			근접 클리핑 평면(near clipping plane)
-	100.f			원거리 클리핑 평면(far clipping plane)
-	*/
-	D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI / 4, 1.f, 1.f, 100.f);	//좌수좌표계(LH)
-
+	// 투영 변환 행렬 계산
+	D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI / 4, 1.0f, 1.0f, 100.f);
+	// 계산된 투영 변환 행렬을 적용
 	g_pd3dDevice->SetTransform(D3DTS_PROJECTION, &matProj);
 }
+
+//VOID SetupMatrices() {
+//	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	//월드 행렬
+//	D3DXMATRIXA16 matWorld;
+//
+//	UINT iTime = timeGetTime() % 1000;									//float 연산의 정밀도를 위해서 1000으로 나머지 연산(1초)
+//	FLOAT fAngle = iTime*(2.0f*D3DX_PI) / 1000.f;						//1초마다 한바퀴씩(2*pi) 회전
+//	D3DXMatrixRotationY(&matWorld, fAngle);								//Y축기준으로 회전행렬을 생성
+//
+//	g_pd3dDevice->SetTransform(D3DTS_WORLD, &matWorld);					//생성한 회전행렬을 월드행렬로 디바이스에 생성
+//
+//	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	//뷰 행렬
+//
+//	//뷰 행렬을 정의하기 위해서는 세가지 값이 필요.
+//	D3DXMATRIXA16 matView;
+//
+//	D3DXVECTOR3 vEyePt(0.0f, 3.0f, -5.0f);									//1. 눈의 위치 (0,3,-5)
+//	D3DXVECTOR3 vLookatPt(0.0f, 0.0f, 0.0f);								//2. 눈이 바라보는 위치(0,0,0)
+//	D3DXVECTOR3 vUpVec(0.0f, 1.0f, 0.0f);									//3. 천정방향을 나타내는 상방벡터(0,1,0) - 아마도 하늘부분을 설정해주는부분인듯? -확인
+//	D3DXMatrixLookAtLH(&matView, &vEyePt, &vLookatPt, &vUpVec);				//1,2,3의 값들로 뷰 행렬 생성 - 좌수좌표계(LH)
+//
+//	g_pd3dDevice->SetTransform(D3DTS_VIEW, &matView);					//생성한 뷰 행렬을 디바이스에 설정
+//
+//	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	//프로젝션 행렬
+//
+//	//프로젝션 행렬을 정의하기 위해서는 시야각(FOV - Field of View)과 종횡비(aspect ratio), 클리핑 평면의 값이 필요하다.
+//	D3DXMATRIXA16 matProj;
+//	/*
+//	matProj			값이 설정될 행렬
+//	D3DX_PI/4		FOV(45도)
+//	1.0f			종횡비
+//	1.0f			근접 클리핑 평면(near clipping plane)
+//	100.f			원거리 클리핑 평면(far clipping plane)
+//	*/
+//	D3DXMatrixPerspectiveFovLH(&matProj, D3DX_PI / 4, 1.f, 1.f, 100.f);	//좌수좌표계(LH)
+//
+//	g_pd3dDevice->SetTransform(D3DTS_PROJECTION, &matProj);
+//}
 
 //릴리즈
 void release() {

@@ -117,6 +117,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="D3D temp.cpp" />
     <ClCompile Include="D3DMain.cpp" />
   </ItemGroup>
   <ItemGroup>
